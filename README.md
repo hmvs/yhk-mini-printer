@@ -1,8 +1,10 @@
 # YHK Mini Printer
 
+> **Fork notice:** This project is a fork of [joshmcarthur/yhk-mini-printer](https://github.com/joshmcarthur/yhk-mini-printer), extended with text and continuous-roll label composers. The original MIT licence and copyright notice are retained in [LICENSE](LICENSE).
+
 Browser-based control for cheap BLE mini thermal printers. Connect over Web Bluetooth from Chrome and print raster images using ESC/POS (`GS v 0`) commands.
 
-**Live demo:** [joshmcarthur.github.io/yhk-mini-printer](https://joshmcarthur.github.io/yhk-mini-printer/) (requires Chrome/Edge — Web Bluetooth needs HTTPS)
+**Live demo:** [hmvs.github.io/yhk-mini-printer](https://hmvs.github.io/yhk-mini-printer/) (requires Chrome/Edge — Web Bluetooth needs HTTPS)
 
 In theory, any pocket thermal printer that accepts **rasterized bytes over BLE** via an ISSC-style UART service should work. Compatibility depends on the BLE GATT profile and whether the firmware accepts ESC/POS bitmap commands (many cheap "cat printer" class devices do).
 
@@ -101,6 +103,18 @@ Disconnect the printer from other phone apps before connecting.
 | **Browser** | Chrome or Edge (desktop/Android). Not Safari/iOS — use the [iOS app](#ios-app) instead. |
 | **Host** | `localhost` or HTTPS |
 | **Printer** | BLE thermal with ISSC UART + ESC/POS raster (see [Supported devices](#supported-devices)) |
+
+## Privacy and data flow
+
+The GitHub Pages web app has no analytics, advertising, tracking pixels, cookies, telemetry, or third-party API calls. Text, QR payloads, and label content are rendered in the browser; when you print, the raster data goes directly from that browser to the selected Bluetooth printer. Composer settings are stored only in that browser's `sessionStorage` and are discarded when the browser session ends.
+
+GitHub Pages necessarily receives normal web-hosting requests for the app assets (such as your IP address and browser request metadata), but the app does not submit your print content to GitHub or another service.
+
+The optional local integrations have separate, explicit data paths:
+
+* The local print server binds to `127.0.0.1` by default and sends print data to the paired BLE printer. Do not expose it to a network you do not trust.
+* A server `image` block with an `http` or `https` URL makes the local server download that specific image. Use base64 image blocks if the image must never be requested from another host.
+* The MCP client sends data only to `PRINT_SERVER_URL` (localhost by default). The teletype integration reads from the MQTT broker configured by `MQTT_URL` and forwards matching messages to `PRINT_SERVER_URL`.
 
 ## Documentation
 
