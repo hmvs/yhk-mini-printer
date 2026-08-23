@@ -64,10 +64,10 @@ Implementation: [`src/escpos.ts`](../src/escpos.ts).
 
 `writeValueWithoutResponse` has no per-chunk acknowledgement. The printer's internal buffer is only a few KB — sending faster than the print head consumes data causes **silent data loss**, typically truncating the bottom of the image.
 
-The app also splits output taller than 240 rows into adjacent `GS v 0` raster
-commands. This avoids a firmware limit in YHK-class printers that can otherwise
-leave long text or multi-label jobs stuck after their first section or interpret
-the remaining bitmap as commands.
+The app splits output taller than 240 rows into adjacent `GS v 0` raster
+commands. Browser printing sends each band as a separate paced transfer,
+including the normal flush delay, so the printer can drain its input buffer
+before the next band. The bands are contiguous and do not add paper feeds.
 
 Defaults in [`src/transport.ts`](../src/transport.ts):
 

@@ -1,6 +1,6 @@
 import { PRINTER_WIDTH } from "@shared/constants.ts";
-import { buildPrintJob } from "@shared/escpos.ts";
 import { drawPreview, thresholdImageData } from "./image.ts";
+import { preparePrintJob, sendPrintJob } from "./print-job.ts";
 import { createConnectionController, initializeBluetoothUi } from "./ui/connection.ts";
 import { WebBluetoothTransport } from "./transport/web-bluetooth.ts";
 
@@ -220,9 +220,9 @@ async function printLabels(): Promise<void> {
   try {
     const result = composeLabels(state);
     drawPreview(previewCanvas, result.canvas);
-    const job = buildPrintJob(result.pixels);
-    connection.log(`Sending ${job.length} bytes with paced BLE writes...`);
-    await transport.send(job);
+    const job = preparePrintJob(result.pixels);
+    connection.log(`Sending ${job.byteLength} bytes in ${job.segments.length} paced BLE bands...`);
+    await sendPrintJob(transport, job);
     connection.log("Print job sent. Tear labels at the dashed guides.");
   } catch (error) {
     connection.log(`Print failed: ${connection.formatError(error)}`);

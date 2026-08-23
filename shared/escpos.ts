@@ -12,10 +12,9 @@ function concatBytes(chunks: Uint8Array[]): Uint8Array {
 }
 
 /**
- * YHK-class printers accept the standard 16-bit GS v 0 height field, but their
- * firmware becomes unreliable when a single raster command is very tall. 240
- * rows is the established, working test-image height; retain a seamless image
- * on paper by emitting larger documents as bands of that size.
+ * Keep raster commands at the established, working 240-row test-image height.
+ * Besides avoiding one very large command, this lets browser transports pause
+ * between independently parsable bands without adding paper feeds.
  */
 export const MAX_RASTER_ROWS_PER_COMMAND = 240;
 
@@ -109,12 +108,17 @@ export function rasterImages(
   return images;
 }
 
-export function buildPrintJob(pixels: boolean[][]): Uint8Array {
+export function buildPrintJobSegments(pixels: boolean[][]): Uint8Array[] {
   const { bitmap, widthBytes, height } = pixelsToBitmap(pixels);
-  return concatBytes([
-    init(),
-    ...rasterImages(bitmap, widthBytes, height),
-    feedLines(4),
-    lineFeeds(3),
-  ]);
+  const images = rasterImages(bitmap, widthBytes, height);
+
+  return images.map((image, index) => concatBytes([
+    ...(index === 0 ? [init()] : []),
+    image,
+    ...(index === images.length - 1 ? [feedLines(4), lineFeeds(3)] : []),
+  ]));
+}
+
+export function buildPrintJob(pixels: boolean[][]): Uint8Array {
+  return concatBytes(buildPrintJobSegments(pixels));
 }

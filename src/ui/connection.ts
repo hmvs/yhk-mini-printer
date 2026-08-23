@@ -30,6 +30,25 @@ export interface ConnectionController {
   disconnect: () => Promise<void>;
 }
 
+function printerNotificationMessage(data: Uint8Array): string | null {
+  if (data[0] === 0xff) {
+    const statuses: Record<number, string> = {
+      0x01: "Printer is out of paper.",
+      0x02: "Printer cover is open.",
+      0x03: "Printer is overheating; let it cool down.",
+      0x04: "Printer battery is low.",
+      0x05: "Printer cover is closed.",
+    };
+    return statuses[data[1] ?? -1] ?? null;
+  }
+
+  if (data[0] === 0xaa || data[0] === 0x4f || data[0] === 0x4b) {
+    return "Printer reported job completion.";
+  }
+
+  return null;
+}
+
 export function formatTransportError(error: unknown): string {
   if (error instanceof PrinterTransportError) {
     return error.message;
@@ -134,6 +153,13 @@ export function createConnectionController(
     logElement.textContent = `${logElement.textContent ?? ""}[${timestamp}] ${message}\n`;
     logElement.scrollTop = logElement.scrollHeight;
   }
+
+  transport.onNotification = (data) => {
+    const message = printerNotificationMessage(data);
+    if (message) {
+      log(message);
+    }
+  };
 
   function setConnectedState(connected: boolean, deviceName?: string): void {
     connectButton.disabled = connected;
@@ -240,7 +266,7 @@ export function initializeBluetoothUi(
     void controller.disconnect();
   });
 
-  controller.log(readyMessage);
+  controller.log(`${readyMessage} Version ${__APP_VERSION__}.`);
 
   const getConnectionState = getNativeConnectionState();
   if (getConnectionState) {

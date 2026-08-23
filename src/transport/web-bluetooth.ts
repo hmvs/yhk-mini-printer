@@ -27,6 +27,20 @@ function assertWebBluetoothAvailable(): void {
 export class WebBluetoothTransport implements PrinterTransport {
   private device: BluetoothDevice | null = null;
   private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
+  private notifyCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
+  onNotification: ((data: Uint8Array) => void) | undefined;
+
+  private readonly handleNotification = (event: Event): void => {
+    const characteristic = event.target as BluetoothRemoteGATTCharacteristic;
+    const value = characteristic.value;
+    if (!value) {
+      return;
+    }
+
+    this.onNotification?.(
+      new Uint8Array(value.buffer, value.byteOffset, value.byteLength),
+    );
+  };
 
   get connected(): boolean {
     return (
@@ -78,13 +92,24 @@ export class WebBluetoothTransport implements PrinterTransport {
       const notifyCharacteristic = await service.getCharacteristic(
         ISSC_RX_CHARACTERISTIC_UUID,
       );
+      notifyCharacteristic.addEventListener(
+        "characteristicvaluechanged",
+        this.handleNotification,
+      );
       await notifyCharacteristic.startNotifications();
+      this.notifyCharacteristic = notifyCharacteristic;
     } catch {
       // Some printers still print without notifications enabled.
     }
   }
 
   async disconnect(): Promise<void> {
+    this.notifyCharacteristic?.removeEventListener(
+      "characteristicvaluechanged",
+      this.handleNotification,
+    );
+    this.notifyCharacteristic = null;
+
     if (this.device?.gatt?.connected) {
       this.device.gatt.disconnect();
     }
