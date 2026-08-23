@@ -28,6 +28,7 @@ export class WebBluetoothTransport implements PrinterTransport {
   private device: BluetoothDevice | null = null;
   private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
   private notifyCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
+  private useWriteWithResponse = false;
   onNotification: ((data: Uint8Array) => void) | undefined;
 
   private readonly handleNotification = (event: Event): void => {
@@ -87,6 +88,15 @@ export class WebBluetoothTransport implements PrinterTransport {
     this.characteristic = await service.getCharacteristic(
       ISSC_TX_CHARACTERISTIC_UUID,
     );
+    const properties = this.characteristic.properties;
+    if (!properties.write && !properties.writeWithoutResponse) {
+      this.characteristic = null;
+      throw new PrinterTransportError(
+        "Printer characteristic does not support writes.",
+        "characteristic-not-found",
+      );
+    }
+    this.useWriteWithResponse = properties.write;
 
     try {
       const notifyCharacteristic = await service.getCharacteristic(
@@ -115,6 +125,7 @@ export class WebBluetoothTransport implements PrinterTransport {
     }
 
     this.characteristic = null;
+    this.useWriteWithResponse = false;
     this.device = null;
   }
 
@@ -128,10 +139,15 @@ export class WebBluetoothTransport implements PrinterTransport {
     }
 
     await sendChunked((chunk) => {
-      return characteristic.writeValueWithoutResponse(
-        new Uint8Array(chunk),
-      );
+      const value = new Uint8Array(chunk);
+      return this.useWriteWithResponse
+        ? characteristic.writeValueWithResponse(value)
+        : characteristic.writeValueWithoutResponse(value);
     }, data);
+  }
+
+  get writeMode(): "acknowledged" | "unacknowledged" {
+    return this.useWriteWithResponse ? "acknowledged" : "unacknowledged";
   }
 
   get deviceName(): string | undefined {

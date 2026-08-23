@@ -201,6 +201,7 @@ export function createConnectionController(
       } else {
         log(`Connected to ${transport.deviceName ?? "printer"}.`);
       }
+      log(`BLE transport: 180-byte ${transport.writeMode} writes.`);
     } catch (error) {
       setConnectedState(false);
       log(`Connect failed: ${formatTransportError(error)}`);

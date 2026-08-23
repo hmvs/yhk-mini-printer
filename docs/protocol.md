@@ -72,7 +72,7 @@ Defaults in [`src/transport.ts`](../src/transport.ts):
 
 | Constant | Value | Notes |
 |----------|-------|-------|
-| `BLE_CHUNK_SIZE` | 182 bytes | Fits typical BLE MTU |
+| `BLE_CHUNK_SIZE` | 180 bytes | WalkPrint-style YHK transport cap |
 | `BLE_CHUNK_DELAY_MS` | 40 ms | ~5 KB/s — matches ISSC printer sweet spot |
 | `BLE_FLUSH_DELAY_MS` | 1500 ms | Wait for print head after last chunk |
 
@@ -80,6 +80,10 @@ Tuning:
 
 - **Truncated bottom** → increase `BLE_CHUNK_DELAY_MS` (try 50–60 ms).
 - **White horizontal bands** → decrease delay (data arriving slower than head speed).
+
+The browser prefers acknowledged GATT writes when the TX characteristic exposes
+the `write` property. It falls back to `writeWithoutResponse` only when that is
+the printer's sole supported write mode.
 
 Reference: similar ISSC UART printers (YMP-01) documented at [lilting.ch](https://lilting.ch/en/articles/mini-printer-sugar-bluetooth-pc-control).
 
