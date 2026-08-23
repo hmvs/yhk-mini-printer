@@ -37,9 +37,13 @@ If connection fails with "service not found", dump characteristics in Chrome —
 | Command | Bytes | Purpose |
 |---------|-------|---------|
 | Init | `1B 40` | Reset printer (`ESC @`) |
+| Start / density | `1D 49 F0 19` | Start a WalkPrint-style YHK job at density 25 |
 | Raster | `1D 76 30 00` + width + height + bitmap | `GS v 0` — print 1-bit image |
-| Feed lines | `1B 64 n` | `ESC d n` — advance paper |
 | Line feed | `0A` | Advance one line |
+
+The complete WalkPrint-compatible job sequence is init, start/density, one
+raster command, then four line feeds. The density command is required protocol
+framing on this YHK variant, not merely an optional darkness setting.
 
 ### Raster header (`GS v 0`)
 
@@ -63,11 +67,6 @@ Implementation: [`src/escpos.ts`](../src/escpos.ts).
 ## BLE transmission
 
 `writeValueWithoutResponse` has no per-chunk acknowledgement. The printer's internal buffer is only a few KB — sending faster than the print head consumes data causes **silent data loss**, typically truncating the bottom of the image.
-
-The app splits output taller than 240 rows into adjacent `GS v 0` raster
-commands. Browser printing sends each band as a separate paced transfer,
-including the normal flush delay, so the printer can drain its input buffer
-before the next band. The bands are contiguous and do not add paper feeds.
 
 Defaults in [`src/transport.ts`](../src/transport.ts):
 

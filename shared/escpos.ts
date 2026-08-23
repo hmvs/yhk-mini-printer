@@ -11,19 +11,21 @@ function concatBytes(chunks: Uint8Array[]): Uint8Array {
   return result;
 }
 
-/**
- * Keep raster commands at the established, working 240-row test-image height.
- * Besides avoiding one very large command, this lets browser transports pause
- * between independently parsable bands without adding paper feeds.
- */
-export const MAX_RASTER_ROWS_PER_COMMAND = 240;
+/** WalkPrint's default print density for YHK printers. */
+export const DEFAULT_PRINT_DENSITY = 25;
 
 export function init(): Uint8Array {
   return new Uint8Array([0x1b, 0x40]);
 }
 
-export function feedLines(lines: number): Uint8Array {
-  return new Uint8Array([0x1b, 0x64, lines]);
+export function startPrint(
+  density = DEFAULT_PRINT_DENSITY,
+): Uint8Array {
+  if (!Number.isInteger(density) || density < 0 || density > 0xff) {
+    throw new Error("Print density must be an integer from 0 to 255.");
+  }
+
+  return new Uint8Array([0x1d, 0x49, 0xf0, density]);
 }
 
 export function lineFeeds(count: number): Uint8Array {
@@ -83,42 +85,12 @@ export function rasterImage(
   return concatBytes([header, bitmap]);
 }
 
-/** Encode an image as consecutive GS v 0 bands. */
-export function rasterImages(
-  bitmap: Uint8Array,
-  widthBytes: number,
-  height: number,
-  maxRows = MAX_RASTER_ROWS_PER_COMMAND,
-): Uint8Array[] {
-  if (!Number.isInteger(maxRows) || maxRows < 1) {
-    throw new Error("Maximum raster rows must be a positive integer.");
-  }
-
-  if (bitmap.length !== widthBytes * height) {
-    throw new Error("Bitmap length does not match its dimensions.");
-  }
-
-  const images: Uint8Array[] = [];
-  for (let row = 0; row < height; row += maxRows) {
-    const rows = Math.min(maxRows, height - row);
-    const start = row * widthBytes;
-    images.push(rasterImage(bitmap.slice(start, start + rows * widthBytes), widthBytes, rows));
-  }
-
-  return images;
-}
-
-export function buildPrintJobSegments(pixels: boolean[][]): Uint8Array[] {
-  const { bitmap, widthBytes, height } = pixelsToBitmap(pixels);
-  const images = rasterImages(bitmap, widthBytes, height);
-
-  return images.map((image, index) => concatBytes([
-    ...(index === 0 ? [init()] : []),
-    image,
-    ...(index === images.length - 1 ? [feedLines(4), lineFeeds(3)] : []),
-  ]));
-}
-
 export function buildPrintJob(pixels: boolean[][]): Uint8Array {
-  return concatBytes(buildPrintJobSegments(pixels));
+  const { bitmap, widthBytes, height } = pixelsToBitmap(pixels);
+  return concatBytes([
+    init(),
+    startPrint(),
+    rasterImage(bitmap, widthBytes, height),
+    lineFeeds(4),
+  ]);
 }

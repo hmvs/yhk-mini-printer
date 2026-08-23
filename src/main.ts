@@ -1,6 +1,6 @@
+import { buildPrintJob } from "@shared/escpos.ts";
 import { PRINTER_WIDTH } from "@shared/constants.ts";
 import { drawPreview, generateTestPattern } from "./image.ts";
-import { preparePrintJob, sendPrintJob } from "./print-job.ts";
 import {
   createConnectionController,
   initializeBluetoothUi,
@@ -66,9 +66,9 @@ function refreshTestPattern(): void {
 async function handlePrint(): Promise<void> {
   try {
     refreshTestPattern();
-    const job = preparePrintJob(latestPattern.pixels);
-    connection.log(`Sending ${job.byteLength} bytes in ${job.segments.length} paced BLE bands...`);
-    await sendPrintJob(transport, job);
+    const job = buildPrintJob(latestPattern.pixels);
+    connection.log(`Sending ${job.length} bytes with paced BLE writes...`);
+    await transport.send(job);
     connection.log("All print data sent.");
   } catch (error) {
     connection.log(`Print failed: ${connection.formatError(error)}`);
