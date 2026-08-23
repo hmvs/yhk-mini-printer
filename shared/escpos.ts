@@ -11,6 +11,14 @@ function concatBytes(chunks: Uint8Array[]): Uint8Array {
   return result;
 }
 
+/**
+ * YHK-class printers accept the standard 16-bit GS v 0 height field, but their
+ * firmware becomes unreliable when a single raster command is very tall. 240
+ * rows is the established, working test-image height; retain a seamless image
+ * on paper by emitting larger documents as bands of that size.
+ */
+export const MAX_RASTER_ROWS_PER_COMMAND = 240;
+
 export function init(): Uint8Array {
   return new Uint8Array([0x1b, 0x40]);
 }
@@ -76,11 +84,36 @@ export function rasterImage(
   return concatBytes([header, bitmap]);
 }
 
+/** Encode an image as consecutive GS v 0 bands. */
+export function rasterImages(
+  bitmap: Uint8Array,
+  widthBytes: number,
+  height: number,
+  maxRows = MAX_RASTER_ROWS_PER_COMMAND,
+): Uint8Array[] {
+  if (!Number.isInteger(maxRows) || maxRows < 1) {
+    throw new Error("Maximum raster rows must be a positive integer.");
+  }
+
+  if (bitmap.length !== widthBytes * height) {
+    throw new Error("Bitmap length does not match its dimensions.");
+  }
+
+  const images: Uint8Array[] = [];
+  for (let row = 0; row < height; row += maxRows) {
+    const rows = Math.min(maxRows, height - row);
+    const start = row * widthBytes;
+    images.push(rasterImage(bitmap.slice(start, start + rows * widthBytes), widthBytes, rows));
+  }
+
+  return images;
+}
+
 export function buildPrintJob(pixels: boolean[][]): Uint8Array {
   const { bitmap, widthBytes, height } = pixelsToBitmap(pixels);
   return concatBytes([
     init(),
-    rasterImage(bitmap, widthBytes, height),
+    ...rasterImages(bitmap, widthBytes, height),
     feedLines(4),
     lineFeeds(3),
   ]);
