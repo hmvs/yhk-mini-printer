@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Label Composer — YHK Mini Printer</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <div class="header-row">
+          <div>
+            <h1>Label Composer</h1>
+            <p class="subtitle">Full-width labels for continuous paper or sticker rolls</p>
+          </div>
+          <a class="github-link" href="https://github.com/joshmcarthur/yhk-mini-printer" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </header>
+
+      <nav class="app-nav" aria-label="App sections">
+        <a href="./index.html">Test</a>
+        <a href="./text.html">Text</a>
+        <a href="./labels.html" aria-current="page">Labels</a>
+        <a href="./qr.html">QR</a>
+        <a href="./map.html" class="nav-disabled" aria-disabled="true">Map</a>
+      </nav>
+
+      <section class="actions">
+        <button id="connect-btn" type="button">Connect</button>
+        <button id="print-btn" type="button" disabled>Print labels</button>
+        <button id="disconnect-btn" type="button" disabled>Disconnect</button>
+      </section>
+      <p id="connection-status" class="connection-status">Not connected</p>
+
+      <section class="composer-section">
+        <h2>Label content</h2>
+        <div class="field">
+          <label for="title-input">Title</label>
+          <input id="title-input" type="text" placeholder="PANTRY" autofocus />
+        </div>
+        <div class="field">
+          <label for="details-input">Details (optional)</label>
+          <textarea id="details-input" rows="3" placeholder="Rice · use by 12 Sep"></textarea>
+        </div>
+
+        <div class="settings-grid">
+          <div class="field">
+            <label for="height-input">Label height</label>
+            <select id="height-input">
+              <option value="20">Small — 20 mm</option>
+              <option value="30" selected>Standard — 30 mm</option>
+              <option value="40">Large — 40 mm</option>
+              <option value="50">Extra large — 50 mm</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="align-input">Text alignment</label>
+            <select id="align-input">
+              <option value="left">Left</option>
+              <option value="center" selected>Centre</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="copies-input">Copies</label>
+            <input id="copies-input" type="number" min="1" max="20" value="1" />
+          </div>
+        </div>
+
+        <label class="checkbox-label">
+          <input id="border-input" type="checkbox" checked />
+          Add a border
+        </label>
+        <label class="checkbox-label">
+          <input id="tear-guide-input" type="checkbox" checked />
+          Add dashed tear guides between copies
+        </label>
+        <p class="field-hint">Use adhesive thermal paper for stickers. On continuous paper, tear at the dashed guide.</p>
+      </section>
+
+      <section class="preview-section">
+        <h2>Print preview</h2>
+        <canvas id="preview" width="384" height="240"></canvas>
+      </section>
+      <section class="log-section">
+        <h2>Status</h2>
+        <pre id="log" aria-live="polite"></pre>
+      </section>
+    </main>
+    <script type="module" src="/src/labels.ts"></script>
+  </body>
+</html>

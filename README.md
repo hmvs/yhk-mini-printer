@@ -66,6 +66,14 @@ Open [http://localhost:5173/qr.html](http://localhost:5173/qr.html) (or use the 
 
 Wi-Fi QR codes use the standard `WIFI:` format — scan with your phone camera to join the network.
 
+### Text Composer
+
+Open [http://localhost:5173/text.html](http://localhost:5173/text.html) (or use the Text nav link) to print regular text rather than a QR code. The live preview supports writing across the paper or rotating a complete line of text to run along the roll, plus left/centre/right alignment, regular or bold type, font size, line spacing, and X/Y positioning. The printer outputs a static raster image, so the movement controls position the text on the printed page rather than animate it.
+
+### Label Composer
+
+Open [http://localhost:5173/labels.html](http://localhost:5173/labels.html) to make full-width labels for continuous thermal or adhesive paper. Add a title and optional details, choose a 20–50 mm print height, alignment, border, number of copies, and dashed tear guides. The height is based on the printer's 8-dot/mm raster resolution; use the preview to allow for your printer's margins and paper feed.
+
 ## iOS app
 
 An iOS app in [`ios/`](ios/) wraps the same web UI in a `WKWebView` and polyfills `navigator.bluetooth` via CoreBluetooth. No changes to the web transport are required — chunk pacing still runs in JavaScript.

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Text Composer — YHK Mini Printer</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <div class="header-row">
+          <div>
+            <h1>Text Composer</h1>
+            <p class="subtitle">Lay out text before printing it as a raster image</p>
+          </div>
+          <a
+            class="github-link"
+            href="https://github.com/joshmcarthur/yhk-mini-printer"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            GitHub
+          </a>
+        </div>
+      </header>
+
+      <nav class="app-nav" aria-label="App sections">
+        <a href="./index.html">Test</a>
+        <a href="./text.html" aria-current="page">Text</a>
+        <a href="./labels.html">Labels</a>
+        <a href="./qr.html">QR</a>
+        <a href="./map.html" class="nav-disabled" aria-disabled="true">Map</a>
+      </nav>
+
+      <section class="actions">
+        <button id="connect-btn" type="button">Connect</button>
+        <button id="print-btn" type="button" disabled>Print text</button>
+        <button id="disconnect-btn" type="button" disabled>Disconnect</button>
+      </section>
+
+      <p id="connection-status" class="connection-status">Not connected</p>
+
+      <section class="composer-section">
+        <h2>Text</h2>
+        <div class="field">
+          <label for="text-input">What should the printer say?</label>
+          <textarea
+            id="text-input"
+            rows="5"
+            placeholder="Type your message here"
+            autofocus
+          ></textarea>
+          <p class="field-hint">Use a new line to start a new row (or a new vertical column).</p>
+        </div>
+
+        <div class="settings-grid">
+          <div class="field">
+            <label for="direction-input">Writing direction</label>
+            <select id="direction-input">
+              <option value="horizontal">Horizontal</option>
+              <option value="rotate-clockwise">Along roll (rotate right)</option>
+              <option value="rotate-counterclockwise">Along roll (rotate left)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="align-input">Horizontal alignment</label>
+            <select id="align-input">
+              <option value="left">Left</option>
+              <option value="center" selected>Centre</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="weight-input">Weight</label>
+            <select id="weight-input">
+              <option value="normal">Regular</option>
+              <option value="bold">Bold</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="font-size-input">
+            Font size: <span id="font-size-value">32</span>px
+          </label>
+          <input id="font-size-input" type="range" min="12" max="72" step="1" value="32" />
+        </div>
+
+        <div class="field">
+          <label for="line-spacing-input">
+            Line spacing: <span id="line-spacing-value">125</span>%
+          </label>
+          <input id="line-spacing-input" type="range" min="80" max="220" step="5" value="125" />
+        </div>
+
+        <div class="field">
+          <label for="x-offset-input">
+            Move horizontally: <span id="x-offset-value">0</span>px
+          </label>
+          <input id="x-offset-input" type="range" min="-160" max="160" step="1" value="0" />
+        </div>
+
+        <div class="field">
+          <label for="y-offset-input">
+            Move down: <span id="y-offset-value">16</span>px
+          </label>
+          <input id="y-offset-input" type="range" min="0" max="240" step="1" value="16" />
+        </div>
+      </section>
+
+      <section class="preview-section">
+        <h2>Print preview</h2>
+        <canvas id="preview" width="384" height="240"></canvas>
+      </section>
+
+      <section class="log-section">
+        <h2>Status</h2>
+        <pre id="log" aria-live="polite"></pre>
+      </section>
+    </main>
+    <script type="module" src="/src/text.ts"></script>
+  </body>
+</html>

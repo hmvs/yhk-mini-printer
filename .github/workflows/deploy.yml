@@ -33,7 +33,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          BASE_PATH: /yhk-mini-printer/
+          # Project Pages are hosted at /<repository-name>/, including forks.
+          BASE_PATH: /${{ github.event.repository.name }}/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
