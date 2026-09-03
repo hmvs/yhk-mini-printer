@@ -22,8 +22,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(rootDir, "index.html"),
-        text: path.resolve(rootDir, "text.html"),
-        labels: path.resolve(rootDir, "labels.html"),
         qr: path.resolve(rootDir, "qr.html"),
       },
     },

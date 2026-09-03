@@ -3,78 +3,361 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>YHK Mini Printer</title>
+    <title>Print Studio — YHK Mini Printer</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <main class="app">
-      <header>
-        <div class="header-row">
-          <div>
-            <h1>YHK Mini Printer</h1>
-            <p class="subtitle">Phase 1 — Web Bluetooth proof of concept</p>
+    <header class="topbar">
+      <div class="brand">
+        <h1>Print Studio</h1>
+        <span class="brand-tag">58 mm thermal</span>
+      </div>
+      <div class="topbar-actions">
+        <span id="connection-status" class="status-chip">Not connected</span>
+        <button id="connect-btn" class="btn" type="button">Connect</button>
+        <button id="disconnect-btn" class="btn ghost" type="button">Disconnect</button>
+        <button id="print-btn" class="btn primary" type="button" disabled>Print</button>
+        <a class="btn ghost" href="./qr.html">QR page</a>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="canvas-pane">
+        <div class="toolbar">
+          <div class="toolbar-group" role="group" aria-label="Add to the page">
+            <button id="add-text-btn" class="btn tool" type="button">
+              <span aria-hidden="true">T</span> Text
+            </button>
+            <button id="add-image-btn" class="btn tool" type="button">
+              <span aria-hidden="true">▣</span> Image
+            </button>
+            <button id="add-sticker-btn" class="btn tool" type="button">
+              <span aria-hidden="true">★</span> Sticker
+            </button>
+            <button id="add-qr-btn" class="btn tool" type="button">
+              <span aria-hidden="true">▦</span> QR
+            </button>
+            <button id="add-rule-btn" class="btn tool" type="button">
+              <span aria-hidden="true">─</span> Line
+            </button>
           </div>
-          <a
-            class="github-link"
-            href="https://github.com/hmvs/yhk-mini-printer"
-            target="_blank"
-            rel="noopener noreferrer"
+          <div class="toolbar-group" role="group" aria-label="Zoom">
+            <button id="zoom-out-btn" class="btn icon" type="button" aria-label="Zoom out">−</button>
+            <span id="zoom-label" class="zoom-label">100%</span>
+            <button id="zoom-in-btn" class="btn icon" type="button" aria-label="Zoom in">+</button>
+          </div>
+        </div>
+
+        <div class="stage-wrap">
+          <div class="stage-frame">
+            <canvas id="stage" class="stage-canvas" width="768" height="320"></canvas>
+            <p id="stage-empty" class="stage-empty" hidden>
+              Empty page — add text, an image or a sticker to begin.
+            </p>
+          </div>
+        </div>
+
+        <div class="stage-footer">
+          <p id="stage-info" class="meta">Empty page.</p>
+          <div class="toolbar-group">
+            <button id="undo-btn" class="btn small" type="button" disabled>Undo</button>
+            <button id="duplicate-btn" class="btn small" type="button" disabled>Duplicate</button>
+            <button id="forward-btn" class="btn small" type="button" disabled>Forward</button>
+            <button id="backward-btn" class="btn small" type="button" disabled>Back</button>
+            <button id="delete-btn" class="btn small danger" type="button" disabled>Delete</button>
+            <button id="download-btn" class="btn small" type="button">Save PNG</button>
+          </div>
+        </div>
+
+        <details class="hint">
+          <summary>How to edit</summary>
+          <ul>
+            <li>Drag an element to move it; the page snaps to its centre and edges.</li>
+            <li>Pull a square handle to resize; the round handle above rotates (hold <kbd>Shift</kbd> for 15° steps).</li>
+            <li>Double-click text to jump to its editor.</li>
+            <li><kbd>←↑↓→</kbd> nudge, <kbd>Delete</kbd> removes, <kbd>⌘/Ctrl</kbd>+<kbd>Z</kbd> undoes, <kbd>Esc</kbd> deselects.</li>
+            <li>Drop or paste an image anywhere on the window.</li>
+          </ul>
+        </details>
+      </section>
+
+      <aside class="inspector">
+        <div class="tabs" role="tablist">
+          <button
+            id="tab-design-btn"
+            class="tab"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="tab-design"
           >
-            GitHub
-          </a>
+            Design
+          </button>
+          <button
+            id="tab-element-btn"
+            class="tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="tab-element"
+          >
+            Element
+          </button>
+          <button
+            id="tab-page-btn"
+            class="tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="tab-page"
+          >
+            Page
+          </button>
         </div>
-      </header>
 
-      <nav class="app-nav" aria-label="App sections">
-        <a href="./index.html" aria-current="page">Test</a>
-        <a href="./text.html">Text</a>
-        <a href="./labels.html">Labels</a>
-        <a href="./qr.html">QR</a>
-        <a href="./map.html" class="nav-disabled" aria-disabled="true">Map</a>
-      </nav>
+        <div id="tab-design" class="tab-panel" role="tabpanel">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Start from a template</h2>
+              <p class="meta">Drops real elements you can then edit.</p>
+            </div>
+            <div id="template-gallery" class="gallery"></div>
+            <p id="template-hint" class="meta"></p>
+          </section>
 
-      <section class="actions">
-        <button id="connect-btn" type="button">Connect</button>
-        <button id="print-btn" type="button" disabled>Print Test Image</button>
-        <button id="disconnect-btn" type="button" disabled>Disconnect</button>
-      </section>
-
-      <p id="connection-status" class="connection-status">Not connected</p>
-
-      <section id="device-info" class="device-info" hidden>
-        <h2>Print server</h2>
-        <p id="device-address-label" class="device-info-label">BLE address</p>
-        <div class="device-info-row">
-          <code id="device-address"></code>
-          <button id="copy-address-btn" type="button" disabled>Copy</button>
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Border</h2>
+              <p class="meta">Frames the whole page.</p>
+            </div>
+            <div id="border-gallery" class="gallery gallery-tight"></div>
+          </section>
         </div>
-        <p id="device-address-hint" class="device-info-hint"></p>
-      </section>
 
-      <section class="preview-section">
-        <h2>Preview</h2>
-        <canvas id="preview" width="384" height="240"></canvas>
-      </section>
+        <div id="tab-element" class="tab-panel" role="tabpanel" hidden>
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Layers</h2>
+              <p class="meta">Top of the list prints on top.</p>
+            </div>
+            <ul id="layer-list" class="layer-list"></ul>
+          </section>
 
-      <section class="log-section">
-        <h2>Status</h2>
-        <pre id="log" aria-live="polite"></pre>
-      </section>
+          <p id="props-empty" class="empty-note">
+            Nothing selected. Click an element on the page or pick one from the
+            list above.
+          </p>
 
-      <section class="demo-section">
-        <h2>Demo</h2>
-        <div class="demo-grid">
-          <figure class="demo-item">
-            <figcaption>Web app — connect and print</figcaption>
-            <video src="./docs/images/screen-record.webm" controls playsinline></video>
-          </figure>
-          <figure class="demo-item">
-            <figcaption>Printer output — test image on paper</figcaption>
-            <video src="./docs/images/demo.webm" controls playsinline></video>
-          </figure>
+          <section id="props-common" class="panel" hidden>
+            <div class="panel-head">
+              <h2 id="props-title">Element</h2>
+            </div>
+            <div class="field">
+              <span class="field-label">Align on the page</span>
+              <div class="segmented" role="group" aria-label="Align on the page">
+                <button id="align-left-btn" class="btn small" type="button">Left</button>
+                <button id="align-center-btn" class="btn small" type="button">Centre</button>
+                <button id="align-right-btn" class="btn small" type="button">Right</button>
+              </div>
+            </div>
+            <div class="slider-field">
+              <label for="rotation-input">Rotation <output id="rotation-value">0°</output></label>
+              <input id="rotation-input" type="range" min="0" max="359" step="1" value="0" />
+            </div>
+            <div class="toolbar-group">
+              <button id="rotate-reset-btn" class="btn small" type="button">Straighten</button>
+            </div>
+          </section>
+
+          <section id="props-text" class="panel" hidden>
+            <div class="field">
+              <label for="text-input">Text</label>
+              <textarea id="text-input" rows="3"></textarea>
+            </div>
+            <div class="slider-field">
+              <label for="font-size-input">Size <output id="font-size-value">22</output></label>
+              <input id="font-size-input" type="range" min="8" max="120" step="1" value="22" />
+            </div>
+            <div class="field">
+              <span class="field-label">Alignment</span>
+              <div class="segmented" role="group" aria-label="Text alignment">
+                <button class="btn small" type="button" data-text-align="left">Left</button>
+                <button class="btn small" type="button" data-text-align="center">Centre</button>
+                <button class="btn small" type="button" data-text-align="right">Right</button>
+              </div>
+            </div>
+            <div class="field">
+              <span class="field-label">Style</span>
+              <div class="toolbar-group">
+                <button id="bold-btn" class="btn small" type="button" aria-pressed="false"><strong>B</strong></button>
+                <button id="italic-btn" class="btn small" type="button" aria-pressed="false"><em>I</em></button>
+                <button id="text-invert-btn" class="btn small" type="button" aria-pressed="false">White on black</button>
+              </div>
+            </div>
+            <div class="field">
+              <span class="field-label">Typeface</span>
+              <div class="segmented" role="group" aria-label="Typeface">
+                <button class="btn small" type="button" data-font="sans">Sans</button>
+                <button class="btn small" type="button" data-font="serif">Serif</button>
+                <button class="btn small" type="button" data-font="mono">Mono</button>
+              </div>
+            </div>
+            <div class="slider-field">
+              <label for="line-spacing-input">Line spacing <output id="line-spacing-value">1.25</output></label>
+              <input id="line-spacing-input" type="range" min="0.9" max="2.5" step="0.05" value="1.25" />
+            </div>
+          </section>
+
+          <section id="props-image" class="panel" hidden>
+            <div class="toolbar-group">
+              <button id="fit-width-btn" class="btn small" type="button">Fit width</button>
+              <button id="reset-aspect-btn" class="btn small" type="button">Fix aspect</button>
+              <button id="crop-btn" class="btn small" type="button" aria-pressed="false">Crop</button>
+              <button id="flip-h-btn" class="btn small" type="button" aria-pressed="false">Flip ↔</button>
+              <button id="flip-v-btn" class="btn small" type="button" aria-pressed="false">Flip ↕</button>
+              <button id="replace-image-btn" class="btn small" type="button">Replace</button>
+            </div>
+
+            <div id="crop-panel" class="subpanel" hidden>
+              <canvas id="crop-canvas" class="crop-canvas"></canvas>
+              <p class="meta">Drag to select, pull a handle to resize, double-click to clear.</p>
+              <div class="toolbar-group">
+                <button id="crop-clear-btn" class="btn small" type="button">Clear crop</button>
+                <button id="crop-done-btn" class="btn small" type="button">Done</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="mode-input">Dither style</label>
+              <select id="mode-input"></select>
+            </div>
+            <div class="slider-field">
+              <label for="threshold-input">Darkness <output id="threshold-value">128</output></label>
+              <input id="threshold-input" type="range" min="16" max="240" step="1" value="128" />
+            </div>
+            <div class="toolbar-group">
+              <button id="auto-level-btn" class="btn small" type="button" aria-pressed="false">Auto-level</button>
+              <button id="image-invert-btn" class="btn small" type="button" aria-pressed="false">Invert</button>
+            </div>
+
+            <details class="subpanel">
+              <summary>Fine tuning</summary>
+              <div class="slider-field">
+                <label for="brightness-input">Brightness <output id="brightness-value">0</output></label>
+                <input id="brightness-input" type="range" min="-100" max="100" step="1" value="0" />
+              </div>
+              <div class="slider-field">
+                <label for="contrast-input">Contrast <output id="contrast-value">0</output></label>
+                <input id="contrast-input" type="range" min="-100" max="100" step="1" value="0" />
+              </div>
+              <div class="slider-field">
+                <label for="gamma-input">Gamma <output id="gamma-value">1.00</output></label>
+                <input id="gamma-input" type="range" min="0.2" max="3" step="0.05" value="1" />
+              </div>
+              <div class="slider-field">
+                <label for="sharpen-input">Sharpen <output id="sharpen-value">0</output></label>
+                <input id="sharpen-input" type="range" min="0" max="100" step="1" value="0" />
+              </div>
+            </details>
+          </section>
+
+          <section id="props-sticker" class="panel" hidden>
+            <div class="field">
+              <label for="sticker-search">Find a sticker</label>
+              <input id="sticker-search" type="search" placeholder="star, heart, arrow…" />
+            </div>
+            <div id="sticker-grid" class="sticker-grid"></div>
+            <p id="sticker-empty" class="meta" hidden>No sticker matches that search.</p>
+            <div class="toolbar-group">
+              <button id="sticker-invert-btn" class="btn small" type="button" aria-pressed="false">White on black</button>
+            </div>
+          </section>
+
+          <section id="props-qr" class="panel" hidden>
+            <div class="field">
+              <label for="qr-data-input">QR contents</label>
+              <textarea id="qr-data-input" rows="2"></textarea>
+            </div>
+            <div class="field">
+              <span class="field-label">Error correction</span>
+              <div class="segmented" role="group" aria-label="Error correction">
+                <button class="btn small" type="button" data-ecc="M">Medium</button>
+                <button class="btn small" type="button" data-ecc="Q">Quartile</button>
+                <button class="btn small" type="button" data-ecc="H">High</button>
+              </div>
+            </div>
+            <p class="meta">Higher correction still scans when the paper smudges.</p>
+          </section>
+
+          <section id="props-rule" class="panel" hidden>
+            <div class="field">
+              <label for="rule-style-input">Line style</label>
+              <select id="rule-style-input">
+                <option value="solid">Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+                <option value="double">Double</option>
+                <option value="wave">Wave</option>
+              </select>
+            </div>
+            <div class="slider-field">
+              <label for="rule-thickness-input">Thickness <output id="rule-thickness-value">2</output></label>
+              <input id="rule-thickness-input" type="range" min="1" max="12" step="1" value="2" />
+            </div>
+          </section>
         </div>
-      </section>
+
+        <div id="tab-page" class="tab-panel" role="tabpanel" hidden>
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Paper</h2>
+              <p class="meta">The page grows with your content and shrinks back when you move things up.</p>
+            </div>
+            <div class="slider-field">
+              <label for="bottom-margin-input">Bottom margin <output id="bottom-margin-value">24</output></label>
+              <input id="bottom-margin-input" type="range" min="0" max="120" step="2" value="24" />
+            </div>
+            <div class="slider-field">
+              <label for="min-height-input">Minimum height <output id="min-height-value">160</output></label>
+              <input id="min-height-input" type="range" min="96" max="600" step="8" value="160" />
+            </div>
+            <div class="slider-field">
+              <label for="feed-input">Feed after print <output id="feed-value">4</output></label>
+              <input id="feed-input" type="range" min="0" max="12" step="1" value="4" />
+            </div>
+            <div class="toolbar-group">
+              <button id="clear-btn" class="btn small danger" type="button">Clear page</button>
+            </div>
+          </section>
+
+          <section id="device-info" class="panel" hidden>
+            <div class="panel-head">
+              <h2>Printer</h2>
+              <p id="device-address-label" class="meta">BLE address</p>
+            </div>
+            <div class="toolbar-group">
+              <code id="device-address"></code>
+              <button id="copy-address-btn" class="btn small" type="button" disabled>Copy</button>
+            </div>
+            <p id="device-address-hint" class="meta"></p>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Activity</h2>
+            </div>
+            <pre id="log" aria-live="polite"></pre>
+          </section>
+        </div>
+      </aside>
     </main>
+
+    <input
+      id="file-input"
+      class="sr-only"
+      type="file"
+      accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/svg+xml,image/avif"
+    />
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

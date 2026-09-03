@@ -85,12 +85,28 @@ export function rasterImage(
   return concatBytes([header, bitmap]);
 }
 
-export function buildPrintJob(pixels: boolean[][]): Uint8Array {
+export interface PrintJobOptions {
+  /** Burn strength; higher is darker but slower. */
+  density?: number;
+  /** Blank lines fed after the image so it clears the tear bar. */
+  feedLines?: number;
+}
+
+export function buildPrintJob(
+  pixels: boolean[][],
+  options: PrintJobOptions = {},
+): Uint8Array {
+  const { density = DEFAULT_PRINT_DENSITY, feedLines = 4 } = options;
+
+  if (!Number.isInteger(feedLines) || feedLines < 0 || feedLines > 64) {
+    throw new Error("Feed lines must be an integer from 0 to 64.");
+  }
+
   const { bitmap, widthBytes, height } = pixelsToBitmap(pixels);
   return concatBytes([
     init(),
-    startPrint(),
+    startPrint(density),
     rasterImage(bitmap, widthBytes, height),
-    lineFeeds(4),
+    lineFeeds(feedLines),
   ]);
 }

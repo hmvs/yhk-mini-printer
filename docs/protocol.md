@@ -62,13 +62,13 @@ if (pixelIsBlack) {
 }
 ```
 
-Implementation: [`src/escpos.ts`](../src/escpos.ts).
+Implementation: [`shared/escpos.ts`](../shared/escpos.ts).
 
 ## BLE transmission
 
 `writeValueWithoutResponse` has no per-chunk acknowledgement. The printer's internal buffer is only a few KB — sending faster than the print head consumes data causes **silent data loss**, typically truncating the bottom of the image.
 
-Defaults in [`src/transport.ts`](../src/transport.ts):
+Defaults in [`shared/constants.ts`](../shared/constants.ts):
 
 | Constant | Value | Notes |
 |----------|-------|-------|
@@ -89,11 +89,13 @@ Reference: similar ISSC UART printers (YMP-01) documented at [lilting.ch](https:
 
 ## Image preparation
 
-1. Render to canvas at **384 px** width.
-2. Threshold grayscale at 128 → boolean `[][]` (black = `true`).
-3. Pass to `buildPrintJob()`.
+1. Render or scale to canvas at **384 px** width (or less, padded to 384 with white).
+2. Convert to grayscale, apply tone adjustments, then halftone to boolean `[][]` (black = `true`).
+   Plain threshold at 128 suits line art; error diffusion suits photos — see
+   [`shared/halftone.ts`](../shared/halftone.ts).
+3. Pass to `buildPrintJob(pixels, { feedLines })`.
 
-Some printers output upside-down (paper path). If orientation is wrong, rotate the canvas 180° before encoding.
+Some printers output upside-down (paper path). If orientation is wrong, rotate 180° before encoding — every studio element has a rotation handle.
 
 ## Exploration notes
 

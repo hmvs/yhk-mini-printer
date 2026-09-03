@@ -1,12 +1,15 @@
 import QRCode from "qrcode";
 import { DEFAULT_COMPOSE_FONT_SIZE, PRINTER_WIDTH } from "@shared/constants.ts";
-import type {
-  ComposerBlock,
-  QrErrorCorrection,
-} from "@shared/print-document.ts";
 import { thresholdImageData } from "../image.ts";
 
-export type { ComposerBlock, QrErrorCorrection } from "@shared/print-document.ts";
+export type QrErrorCorrection = "M" | "Q" | "H";
+
+/** One element of a composed print document, in layout order. */
+export type ComposerBlock =
+  | { type: "title"; text: string }
+  | { type: "text"; text: string; font?: "normal" | "mono"; maxLines?: number }
+  | { type: "qr"; data: string; size?: number; ecc?: QrErrorCorrection }
+  | { type: "spacer"; px: number };
 
 export interface ComposeResult {
   canvas: HTMLCanvasElement;
@@ -208,10 +211,6 @@ function buildLayout(
           spacerPx: block.px,
         });
         break;
-      case "image":
-        throw new Error(
-          "Image blocks are not supported in the browser composer yet.",
-        );
       default: {
         const unreachable: never = block;
         throw new Error(`Unsupported composer block: ${String(unreachable)}`);

@@ -3,32 +3,14 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "workspaces": [
-    "shared",
-    "server",
-    "mcp",
-    "teletype"
-  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "build:pages": "BASE_PATH=/yhk-mini-printer/ npm run build",
-    "build:ios": "tsc && BASE_PATH=./ vite build",
-    "ios:bundle-web": "bash scripts/copy-web-to-ios.sh",
     "preview": "vite preview",
-    "preview:pages": "BASE_PATH=/yhk-mini-printer/ vite preview",
-    "server:dev": "npm run dev -w server",
-    "server:start": "npm run start -w server",
-    "server:build": "npm run build -w server",
-    "server:rebuild-ble": "npm run rebuild --prefix node_modules/@abandonware/noble",
-    "mcp:build": "npm run build -w mcp",
-    "teletype:dev": "npm run dev -w teletype",
-    "teletype:build": "npm run build -w teletype",
-    "teletype:start": "npm run start -w teletype",
-    "teletype:test": "npm run test -w teletype"
+    "preview:pages": "BASE_PATH=/yhk-mini-printer/ vite preview"
   },
   "devDependencies": {
-    "@types/node": "^26.2.0",
     "@types/qrcode": "^1.5.6",
     "@types/web-bluetooth": "^0.0.21",
     "typescript": "^5.9.3",

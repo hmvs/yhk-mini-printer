@@ -2,7 +2,7 @@ import {
   BLE_CHUNK_DELAY_MS,
   BLE_CHUNK_SIZE,
   BLE_FLUSH_DELAY_MS,
-} from "./constants.js";
+} from "./constants.ts";
 
 export interface SendChunkedOptions {
   chunkSize?: number;
