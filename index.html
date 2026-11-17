@@ -17,7 +17,6 @@
         <button id="connect-btn" class="btn" type="button">Connect</button>
         <button id="disconnect-btn" class="btn ghost" type="button">Disconnect</button>
         <button id="print-btn" class="btn primary" type="button" disabled>Print</button>
-        <a class="btn ghost" href="./qr.html">QR page</a>
       </div>
     </header>
 
@@ -25,6 +24,12 @@
       <section class="canvas-pane">
         <div class="toolbar">
           <div class="toolbar-group" role="group" aria-label="Add to the page">
+            <button id="photo-btn" class="btn tool photo" type="button" title="Replace the page with a picture or PDF, fitted to the paper">
+              <span aria-hidden="true">▤</span> Print a picture
+            </button>
+            <button id="postage-btn" class="btn tool" type="button" title="Shrink a carrier's postage label PDF onto 58 mm paper, keeping every barcode identical">
+              <span aria-hidden="true">✉</span> Postage label
+            </button>
             <button id="add-text-btn" class="btn tool" type="button">
               <span aria-hidden="true">T</span> Text
             </button>
@@ -52,7 +57,7 @@
           <div class="stage-frame">
             <canvas id="stage" class="stage-canvas" width="768" height="320"></canvas>
             <p id="stage-empty" class="stage-empty" hidden>
-              Empty page — add text, an image or a sticker to begin.
+              Empty page — pick “Print a picture”, or add text, an image or a sticker.
             </p>
           </div>
         </div>
@@ -76,7 +81,7 @@
             <li>Pull a square handle to resize; the round handle above rotates (hold <kbd>Shift</kbd> for 15° steps).</li>
             <li>Double-click text to jump to its editor.</li>
             <li><kbd>←↑↓→</kbd> nudge, <kbd>Delete</kbd> removes, <kbd>⌘/Ctrl</kbd>+<kbd>Z</kbd> undoes, <kbd>Esc</kbd> deselects.</li>
-            <li>Drop or paste an image anywhere on the window.</li>
+            <li>Drop or paste an image or PDF anywhere on the window.</li>
           </ul>
         </details>
       </section>
@@ -111,7 +116,7 @@
             aria-selected="false"
             aria-controls="tab-page"
           >
-            Page
+            Print
           </button>
         </div>
 
@@ -210,7 +215,8 @@
 
           <section id="props-image" class="panel" hidden>
             <div class="toolbar-group">
-              <button id="fit-width-btn" class="btn small" type="button">Fit width</button>
+              <button id="fit-width-btn" class="btn small" type="button" title="Scale to the full paper width">Fit to paper</button>
+              <button id="turn-btn" class="btn small" type="button" title="Turn a quarter clockwise">Turn 90°</button>
               <button id="reset-aspect-btn" class="btn small" type="button">Fix aspect</button>
               <button id="crop-btn" class="btn small" type="button" aria-pressed="false">Crop</button>
               <button id="flip-h-btn" class="btn small" type="button" aria-pressed="false">Flip ↔</button>
@@ -232,7 +238,7 @@
               <select id="mode-input"></select>
             </div>
             <div class="slider-field">
-              <label for="threshold-input">Darkness <output id="threshold-value">128</output></label>
+              <label for="threshold-input">Threshold <output id="threshold-value">128</output></label>
               <input id="threshold-input" type="range" min="16" max="240" step="1" value="128" />
             </div>
             <div class="toolbar-group">
@@ -310,6 +316,27 @@
         <div id="tab-page" class="tab-panel" role="tabpanel" hidden>
           <section class="panel">
             <div class="panel-head">
+              <h2>Darkness</h2>
+              <p class="meta">How much heat the print head puts into the paper. Darker is bolder but prints slower.</p>
+            </div>
+            <div class="segmented" role="group" aria-label="Darkness preset">
+              <button class="btn small" type="button" data-darkness="light">Light</button>
+              <button class="btn small" type="button" data-darkness="moderate">Moderate</button>
+              <button class="btn small" type="button" data-darkness="dark">Dark</button>
+              <button class="btn small" type="button" data-darkness="custom">Custom</button>
+            </div>
+            <div class="slider-field darkness-slider">
+              <label for="density-input">Heat level <output id="density-value">25</output></label>
+              <input id="density-input" type="range" min="1" max="40" step="1" value="25" />
+            </div>
+            <div class="slider-field">
+              <label for="feed-input">Feed after print <output id="feed-value">4</output></label>
+              <input id="feed-input" type="range" min="0" max="12" step="1" value="4" />
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
               <h2>Paper</h2>
               <p class="meta">The page grows with your content and shrinks back when you move things up.</p>
             </div>
@@ -320,10 +347,6 @@
             <div class="slider-field">
               <label for="min-height-input">Minimum height <output id="min-height-value">160</output></label>
               <input id="min-height-input" type="range" min="96" max="600" step="8" value="160" />
-            </div>
-            <div class="slider-field">
-              <label for="feed-input">Feed after print <output id="feed-value">4</output></label>
-              <input id="feed-input" type="range" min="0" max="12" step="1" value="4" />
             </div>
             <div class="toolbar-group">
               <button id="clear-btn" class="btn small danger" type="button">Clear page</button>
@@ -356,7 +379,7 @@
       id="file-input"
       class="sr-only"
       type="file"
-      accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/svg+xml,image/avif"
+      accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/svg+xml,image/avif,application/pdf,.pdf"
     />
     <script type="module" src="/src/main.ts"></script>
   </body>

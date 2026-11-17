@@ -37,13 +37,17 @@ If connection fails with "service not found", dump characteristics in Chrome —
 | Command | Bytes | Purpose |
 |---------|-------|---------|
 | Init | `1B 40` | Reset printer (`ESC @`) |
-| Start / density | `1D 49 F0 19` | Start a WalkPrint-style YHK job at density 25 |
+| Start / density | `1D 49 F0 nn` | Start a WalkPrint-style YHK job; `nn` is the heat level (25 = `19`) |
 | Raster | `1D 76 30 00` + width + height + bitmap | `GS v 0` — print 1-bit image |
 | Line feed | `0A` | Advance one line |
 
 The complete WalkPrint-compatible job sequence is init, start/density, one
 raster command, then four line feeds. The density command is required protocol
 framing on this YHK variant, not merely an optional darkness setting.
+
+The last byte sets how much energy the head uses per dot, which is the "darkness"
+in WalkPrint. The studio offers Light 20, Moderate 25 (WalkPrint's default) and
+Dark 30, plus a custom level from 1 to 40. Higher values print darker and slower.
 
 ### Raster header (`GS v 0`)
 

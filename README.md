@@ -41,22 +41,33 @@ Open [http://localhost:5173](http://localhost:5173) in **Chrome or Edge**.
 
 1. Power on the printer (disconnect from phone apps first).
 2. Click **Connect** → select `YHK-...` in the picker.
-3. Pick a template or add your own text, images and stickers, then click **Print**.
+3. Click **Print a picture** to print a photo or PDF as-is, or pick a template and add your own text, images and stickers.
+4. Choose a darkness on the **Print** tab, then click **Print**.
 
-## Pages
-
-### Print Studio (`/`)
+## Print Studio
 
 One canvas for everything you print. The page is 384 dots wide — the width of the head — and **grows as you add content and shrinks back when you move things up**, so you only ever feed as much paper as the design needs.
 
-**Layout** — the page sits on the left (sticky on desktop, pinned above the controls on a phone) with a zoom control; everything else lives in a three-tab inspector: **Design** for template and border pickers (both are visual galleries of real previews, not dropdowns), **Element** for a layer list plus the selected element's settings, and **Page** for paper, feed and printer details.
+**Layout** — the page sits on the left (sticky on desktop, pinned above the controls on a phone) with a zoom control; everything else lives in a three-tab inspector: **Design** for template and border pickers (both are visual galleries of real previews, not dropdowns), **Element** for a layer list plus the selected element's settings, and **Print** for darkness, paper, feed and printer details.
+
+**Print a picture or PDF** — the **Print a picture** button replaces the page with an image or PDF fitted to the full paper width. Landscape pictures and pages are turned sideways so they use the whole head, the way the WalkPrint app does. Each PDF page is rendered in the browser with [pdf.js](https://mozilla.github.io/pdf.js/) and stacked down the paper, up to 50 cm per print. Photos default to auto-levelled Floyd–Steinberg dithering; PDFs default to a plain threshold, which keeps text sharp. Every picture is still an ordinary image element, so you can crop it, change the dither style, **Turn 90°** it, or add text and stickers on top. Images and PDFs can also be dropped or pasted onto the window, which adds them to the current page.
+
+**Postage labels** — **Postage label** takes a carrier's label PDF (built against Australia Post MyPost Business labels, on A4 or label stock) and re-flows it onto the 48 mm head:
+
+- Every barcode on the label is decoded with [zxing-cpp](https://github.com/zxing-cpp/zxing-cpp) (WebAssembly, served from this site). Matrix codes such as DataMatrix are redrawn from the decoder's exact module grid. Linear codes such as Code 128 are redrawn from the bar widths measured on the page — the very symbol the carrier printed, never a re-encode — at whole printer dots and turned to run along the paper.
+- The rest of the label (header, address boxes, sender, declaration, captions) is cut along its ruled boxes, scaled to fit and stacked down the strip, with each barcode's human-readable text kept beside it.
+- The finished strip is decoded again, and the label is refused unless every code reads back byte-for-byte identical.
+
+The result is one 1-bit image at exactly the head width, placed dot for dot — move it if you like, but don't resize it. A typical Parcel Post label comes out about 22 cm long. Check that your carrier accepts a label at this size before relying on it.
+
+**Darkness** — how much heat the head burns into the paper (the `density` byte of the job header). **Light** (20), **Moderate** (25, WalkPrint's default) and **Dark** (30) mirror the app's presets; drag the slider for a custom level from 1 to 40. Darker prints are bolder but slower. The choice is remembered in this browser.
 
 **Elements** — add text, images, stickers, QR codes and rules. Every element is **draggable, resizable and rotatable** directly on the canvas: drag the body to move, pull a square handle to resize, and use the round handle above the box to rotate (hold <kbd>Shift</kbd> to snap to 15°). Arrow keys nudge, <kbd>Delete</kbd> removes, <kbd>⌘/Ctrl</kbd>+<kbd>Z</kbd> undoes, and elements snap to the page centre and edges as you drag.
 
 | Element | What you can change |
 |---------|---------------------|
 | Text | Content, sans/serif/mono, size, bold, italic, alignment, line spacing, knockout (white on black). Boxes auto-fit their wrapped text; corner handles scale the type |
-| Image | Drop, paste or browse. Crop, flip, brightness, contrast, gamma, sharpen, auto-level, invert, nine halftone algorithms and a threshold — dithered live at the size it is placed |
+| Image | Drop, paste or browse — PNG, JPEG, WebP, GIF, SVG or PDF. Crop, flip, brightness, contrast, gamma, sharpen, auto-level, invert, nine halftone algorithms and a threshold — dithered live at the size it is placed |
 | Sticker | 30 monochrome vector stickers — stars, hearts, arrows, weather, animals, scissors and more — with an optional knockout |
 | QR | Any payload, three error-correction levels, drawn at whole-module sizes so it always scans |
 | Line | Solid, dashed, dotted, double or wave rules of any thickness |
@@ -66,17 +77,6 @@ One canvas for everything you print. The page is 384 dots wide — the width of 
 **Templates** — pantry jar, freezer bag, use-by date, cable flag, storage box, address, price tag, name badge, gift tag, Wi-Fi card, event ticket, to-do note, coupon, or a blank page. A template drops real elements on the canvas (with today's dates filled in) — everything stays editable afterwards.
 
 **Output** — the canvas is a live 1-bit preview: exactly the dots that will be burned. The readout gives page size in dots and millimetres, ink coverage and job size; **Save PNG** exports the same bitmap. The page (including its images) is kept in `sessionStorage`, so a reload does not lose your work.
-
-### QR composer (`/qr.html`)
-
-A focused page for QR codes with payload presets:
-
-1. Connect to the printer.
-2. Choose a payload type: **URL**, **Plain text**, or **Wi-Fi**.
-3. Optionally add a caption and adjust QR size (180–300px).
-4. Check the live preview, then click **Print**.
-
-Wi-Fi QR codes use the standard `WIFI:` format — scan with your phone camera to join the network.
 
 ## Requirements
 
@@ -118,13 +118,12 @@ src/
 │   ├── borders.ts             # 18 border templates
 │   ├── templates.ts           # Ready-made pages
 │   ├── source.ts              # File / paste / drop image loading
+│   ├── pdf.ts                 # PDF pages → canvases (pdf.js, loaded on demand)
+│   ├── postage.ts             # Postage label PDF → verified 48 mm strip
 │   └── crop-tool.ts           # Interactive crop overlay
-├── qr.ts                      # QR composer page
-├── composer/                  # Block layout + QR rendering for that page
 ├── ui/connection.ts           # Shared BLE connect UI
 ├── transport.ts               # PrinterTransport + paced sendChunked()
-├── transport/web-bluetooth.ts # Web Bluetooth transport
-└── image.ts                   # Canvas thresholding helper
+└── transport/web-bluetooth.ts # Web Bluetooth transport
 ```
 
 ## Build

@@ -1,4 +1,4 @@
-import { buildPrintJob } from "@shared/escpos.ts";
+import { DEFAULT_PRINT_DENSITY, buildPrintJob } from "@shared/escpos.ts";
 import { PRINTER_WIDTH } from "@shared/constants.ts";
 import { HALFTONE_MODES } from "@shared/halftone.ts";
 import {
@@ -12,6 +12,7 @@ import { borderSampleDocument, renderThumbnail } from "./studio/gallery.ts";
 import {
   clearRasterCache,
   documentHeight,
+  elementBounds,
   elementHeight,
 } from "./studio/render.ts";
 import { createStage, type Stage } from "./studio/stage.ts";
@@ -20,6 +21,8 @@ import { TEMPLATES, getTemplate } from "./studio/templates.ts";
 import {
   createId,
   emptyDocument,
+  PAGE_MAX_HEIGHT,
+  PAGE_MIN_HEIGHT,
   type ImageElement,
   type StudioDocument,
   type StudioElement,
@@ -30,11 +33,24 @@ import {
   loadImageFromFile,
   type ImageSource,
 } from "./studio/source.ts";
+import { isPdfFile, loadPdfPages } from "./studio/pdf.ts";
 
 const DOTS_PER_MM = 8;
 const STORAGE_KEY = "yhk-studio-document";
 const MAX_HISTORY = 40;
 const ZOOM_STEPS = [0.75, 1, 1.5, 2, 3];
+const DENSITY_KEY = "yhk-print-density";
+const DENSITY_MIN = 1;
+const DENSITY_MAX = 40;
+
+/** Heat presets, mirroring the WalkPrint app (Moderate is its default). */
+const DARKNESS_PRESETS = {
+  light: 20,
+  moderate: DEFAULT_PRINT_DENSITY,
+  dark: 30,
+} as const;
+
+type DarknessPreset = keyof typeof DARKNESS_PRESETS | "custom";
 
 type TabId = "design" | "element" | "page";
 
@@ -53,6 +69,8 @@ const el = {
   status: required<HTMLElement>("#connection-status"),
   log: required<HTMLPreElement>("#log"),
 
+  photo: required<HTMLButtonElement>("#photo-btn"),
+  postage: required<HTMLButtonElement>("#postage-btn"),
   addText: required<HTMLButtonElement>("#add-text-btn"),
   addImage: required<HTMLButtonElement>("#add-image-btn"),
   addSticker: required<HTMLButtonElement>("#add-sticker-btn"),
@@ -132,6 +150,7 @@ const el = {
   flipH: required<HTMLButtonElement>("#flip-h-btn"),
   flipV: required<HTMLButtonElement>("#flip-v-btn"),
   fitWidth: required<HTMLButtonElement>("#fit-width-btn"),
+  turn: required<HTMLButtonElement>("#turn-btn"),
   resetAspect: required<HTMLButtonElement>("#reset-aspect-btn"),
   crop: required<HTMLButtonElement>("#crop-btn"),
   replaceImage: required<HTMLButtonElement>("#replace-image-btn"),
@@ -155,6 +174,11 @@ const el = {
   bottomMarginValue: required<HTMLOutputElement>("#bottom-margin-value"),
   minHeight: required<HTMLInputElement>("#min-height-input"),
   minHeightValue: required<HTMLOutputElement>("#min-height-value"),
+  density: required<HTMLInputElement>("#density-input"),
+  densityValue: required<HTMLOutputElement>("#density-value"),
+  darknessButtons: [
+    ...document.querySelectorAll<HTMLButtonElement>("[data-darkness]"),
+  ],
   feed: required<HTMLInputElement>("#feed-input"),
   feedValue: required<HTMLOutputElement>("#feed-value"),
   clear: required<HTMLButtonElement>("#clear-btn"),
@@ -189,7 +213,10 @@ let selectedId: string | null = null;
 let history: string[] = [];
 let templateId: string | null = null;
 let pendingReplaceId: string | null = null;
+/** What the next picked file is for: added, a whole-page picture, or a postage label. */
+let pendingPick: "add" | "photo" | "postage" = "add";
 let feedLines = 4;
+let density = loadDensity();
 let zoom = 1;
 let cropTool: CropTool | null = null;
 
@@ -295,7 +322,11 @@ function persist(): void {
     const images: Record<string, string> = {};
     let budget = 2_000_000;
     for (const [id, canvas] of sources) {
-      const data = canvas.toDataURL("image/webp", 0.75);
+      // Print-resolution artwork (postage labels) must survive dot for dot.
+      const data =
+        canvas.width <= PRINTER_WIDTH
+          ? canvas.toDataURL("image/png")
+          : canvas.toDataURL("image/webp", 0.75);
       budget -= data.length;
       if (budget < 0) break;
       images[id] = data;
@@ -447,36 +478,239 @@ function imageElementFor(source: ImageSource, sourceId: string): ImageElement {
   };
 }
 
-async function loadImage(file: File): Promise<void> {
+/**
+ * Snaps to a quarter turn and scales so the rotated image spans the full
+ * paper width, keeping its aspect and the top edge of its bounds.
+ */
+function fitImageToPaper(element: ImageElement, top: number): void {
+  const quarter = (((Math.round(element.rotation / 90) % 4) + 4) % 4) as
+    | 0
+    | 1
+    | 2
+    | 3;
+  const sideways = quarter % 2 === 1;
+  const aspect = element.width / element.height;
+  // Along-paper length for a full-width fit, capped at the longest page.
+  let across = PRINTER_WIDTH;
+  let along = Math.round(sideways ? PRINTER_WIDTH * aspect : PRINTER_WIDTH / aspect);
+  if (along > PAGE_MAX_HEIGHT) {
+    across = Math.round((across * PAGE_MAX_HEIGHT) / along);
+    along = PAGE_MAX_HEIGHT;
+  }
+
+  element.rotation = quarter * 90;
+  element.width = sideways ? along : across;
+  element.height = sideways ? across : along;
+  element.x = Math.round((PRINTER_WIDTH - element.width) / 2);
+  element.y = Math.round(top + along / 2 - element.height / 2);
+}
+
+interface LoadedPicture {
+  source: ImageSource;
+  sourceId: string;
+}
+
+/**
+ * Stacks pictures full width down the paper, turning landscape ones
+ * sideways. With `replacePage` they become the whole page (no border or
+ * margins), otherwise they go below the existing content.
+ */
+function placePictures(
+  pictures: LoadedPicture[],
+  options: { replacePage: boolean; document: boolean },
+): void {
+  let top = options.replacePage ? 0 : nextY();
+  const placed: ImageElement[] = [];
+  for (const { source, sourceId } of pictures) {
+    const element = imageElementFor(source, sourceId);
+    // Documents are mostly text and line art, which dithering turns fuzzy.
+    if (options.document) {
+      element.mode = "threshold";
+    } else {
+      element.autoLevel = true;
+    }
+    element.rotation = source.canvas.width > source.canvas.height ? 90 : 0;
+    fitImageToPaper(element, top);
+    top = elementBounds(element).y + elementBounds(element).height;
+    placed.push(element);
+  }
+
+  if (options.replacePage) {
+    replacePage(placed);
+    return;
+  }
+
+  doc.elements.push(...placed);
+  select(placed[0]?.id ?? null);
+  refresh();
+  updatePrintButton();
+}
+
+/** Makes `elements` the whole page: no border or margins, unused images dropped. */
+function replacePage(elements: StudioElement[]): void {
+  const keep = new Set(
+    elements.flatMap((element) => (element.type === "image" ? [element.sourceId] : [])),
+  );
+  for (const id of [...sources.keys()]) {
+    if (!keep.has(id)) sources.delete(id);
+  }
+  doc = {
+    elements,
+    border: "none",
+    bottomMargin: 0,
+    minHeight: PAGE_MIN_HEIGHT,
+  };
+  templateId = null;
+  clearRasterCache();
+  syncTemplateGallery();
+  syncBorderGallery();
+  syncPage();
+  select(elements[0]?.id ?? null);
+  refresh();
+  updatePrintButton();
+}
+
+/**
+ * Re-flows a carrier's postage PDF onto the 48 mm head. The converter
+ * refuses any label whose barcodes don't read back identically, so what
+ * reaches the page is already verified.
+ */
+async function loadPostageLabel(file: File): Promise<void> {
+  if (!isPdfFile(file)) {
+    connection.log("Postage labels need the carrier's PDF, not an image.");
+    return;
+  }
+
   try {
+    connection.log(`Converting ${file.name} for the 48 mm head...`);
+    const { convertPostagePdf } = await import("./studio/postage.ts");
+    const labels = await convertPostagePdf(file, (message) => connection.log(message));
+
+    const elements: StudioElement[] = [];
+    let y = 0;
+    labels.forEach((label, index) => {
+      if (index > 0) {
+        elements.push({
+          id: createId(),
+          type: "rule",
+          x: 0,
+          y,
+          width: PRINTER_WIDTH,
+          height: 16,
+          rotation: 0,
+          style: "dashed",
+          thickness: 2,
+        });
+        y += 16;
+      }
+      const sourceId = createId();
+      sources.set(sourceId, label.canvas);
+      const element = imageElementFor(
+        {
+          canvas: label.canvas,
+          name: file.name,
+          naturalWidth: label.canvas.width,
+          naturalHeight: label.canvas.height,
+        },
+        sourceId,
+      );
+      // Already 1-bit at exactly the head width: place it dot for dot.
+      Object.assign(element, {
+        x: 0,
+        y,
+        width: label.canvas.width,
+        height: label.canvas.height,
+        mode: "threshold",
+        threshold: 128,
+      });
+      elements.push(element);
+      y += label.canvas.height;
+    });
+
+    replacePage(elements);
+    for (const [index, label] of labels.entries()) {
+      const codes = label.codes.map((code) => `${code.format} ${code.text}`).join("; ");
+      connection.log(
+        `Label ${index + 1} (page ${label.page}): ${(label.canvas.height / DOTS_PER_MM / 10).toFixed(1)} cm. Verified ${codes}.`,
+      );
+    }
+    connection.log("Barcodes are drawn dot for dot — move the label if you like, but don't resize it.");
+  } catch (error) {
+    connection.log(`Could not convert the label: ${connection.formatError(error)}`);
+  }
+}
+
+function describePicture(source: ImageSource): string {
+  return `${source.name} (${source.naturalWidth}×${source.naturalHeight})`;
+}
+
+async function loadImage(file: File): Promise<void> {
+  const replaceId = pendingReplaceId;
+  pendingReplaceId = null;
+  const pick = pendingPick;
+  pendingPick = "add";
+  const photo = pick === "photo";
+
+  if (pick === "postage") {
+    await loadPostageLabel(file);
+    return;
+  }
+
+  try {
+    if (isPdfFile(file)) {
+      connection.log(`Rendering ${file.name}...`);
+      const budget = photo || replaceId ? PAGE_MAX_HEIGHT : PAGE_MAX_HEIGHT - nextY();
+      const { pages, total } = await loadPdfPages(file, budget);
+      const pictures = pages.map((source) => {
+        const sourceId = createId();
+        sources.set(sourceId, source.canvas);
+        return { source, sourceId };
+      });
+
+      if (replaceId && replaceImageSource(replaceId, pictures[0]!)) return;
+
+      placePictures(pictures, { replacePage: photo, document: true });
+      connection.log(
+        pages.length < total
+          ? `Placed pages 1–${pages.length} of ${total}; the rest would run past ${PAGE_MAX_HEIGHT / DOTS_PER_MM / 10} cm of paper.`
+          : `Placed ${total} PDF page${total === 1 ? "" : "s"} from ${file.name}.`,
+      );
+      return;
+    }
+
     const source = await loadImageFromFile(file);
     const sourceId = createId();
     sources.set(sourceId, source.canvas);
 
-    const replaceId = pendingReplaceId;
-    pendingReplaceId = null;
+    if (replaceId && replaceImageSource(replaceId, { source, sourceId })) return;
 
-    if (replaceId) {
-      const element = doc.elements.find((entry) => entry.id === replaceId);
-      if (element?.type === "image") {
-        element.sourceId = sourceId;
-        element.crop = null;
-        element.height = Math.round(
-          (source.canvas.height * element.width) / source.canvas.width,
-        );
-        refresh();
-        syncInspector();
-        return;
-      }
+    if (photo) {
+      placePictures([{ source, sourceId }], { replacePage: true, document: false });
+      const turned = source.canvas.width > source.canvas.height;
+      connection.log(
+        `${describePicture(source)} fills the page${turned ? ", turned sideways to use the full width" : ""}. Undo brings back the previous page.`,
+      );
+      return;
     }
 
     addElement(imageElementFor(source, sourceId));
-    connection.log(
-      `Added ${source.name} (${source.naturalWidth}×${source.naturalHeight}).`,
-    );
+    connection.log(`Added ${describePicture(source)}.`);
   } catch (error) {
-    connection.log(`Could not load image: ${connection.formatError(error)}`);
+    connection.log(`Could not load ${file.name}: ${connection.formatError(error)}`);
   }
+}
+
+function replaceImageSource(id: string, picture: LoadedPicture): boolean {
+  const element = doc.elements.find((entry) => entry.id === id);
+  if (element?.type !== "image") return false;
+  element.sourceId = picture.sourceId;
+  element.crop = null;
+  element.height = Math.round(
+    (picture.source.canvas.height * element.width) / picture.source.canvas.width,
+  );
+  refresh();
+  syncInspector();
+  return true;
 }
 
 function mutate(apply: (element: StudioElement) => void, commit = true): void {
@@ -893,9 +1127,9 @@ async function handlePrint(): Promise<void> {
     selectedId = previous;
     stage.refresh();
 
-    const job = buildPrintJob(page.pixels, { feedLines });
+    const job = buildPrintJob(page.pixels, { feedLines, density });
     connection.log(
-      `Sending ${job.length} bytes (${page.height} raster lines) with paced BLE writes...`,
+      `Sending ${job.length} bytes (${page.height} raster lines, heat ${density}) with paced BLE writes...`,
     );
     el.print.disabled = true;
     await transport.send(job);
@@ -907,17 +1141,64 @@ async function handlePrint(): Promise<void> {
   }
 }
 
+function loadDensity(): number {
+  try {
+    const saved = Number(localStorage.getItem(DENSITY_KEY));
+    if (Number.isInteger(saved) && saved >= DENSITY_MIN && saved <= DENSITY_MAX) {
+      return saved;
+    }
+  } catch {
+    // Private windows may block storage; fall back to the default.
+  }
+  return DEFAULT_PRINT_DENSITY;
+}
+
+function darknessPreset(value: number): DarknessPreset {
+  for (const [preset, level] of Object.entries(DARKNESS_PRESETS)) {
+    if (level === value) return preset as DarknessPreset;
+  }
+  return "custom";
+}
+
+function setDensity(value: number): void {
+  density = Math.min(DENSITY_MAX, Math.max(DENSITY_MIN, Math.round(value)));
+  el.density.value = String(density);
+  el.densityValue.textContent = String(density);
+  const preset = darknessPreset(density);
+  for (const button of el.darknessButtons) {
+    setPressed(button, button.dataset.darkness === preset);
+  }
+  el.print.title = `Print at heat level ${density} (${preset})`;
+  try {
+    localStorage.setItem(DENSITY_KEY, String(density));
+  } catch {
+    // Best-effort preference.
+  }
+}
+
 function initializeControls(): void {
   el.addText.addEventListener("click", addText);
   el.addSticker.addEventListener("click", addStickerElement);
   el.addQr.addEventListener("click", addQrElement);
   el.addRule.addEventListener("click", addRuleElement);
+  el.photo.addEventListener("click", () => {
+    pendingReplaceId = null;
+    pendingPick = "photo";
+    el.file.click();
+  });
+  el.postage.addEventListener("click", () => {
+    pendingReplaceId = null;
+    pendingPick = "postage";
+    el.file.click();
+  });
   el.addImage.addEventListener("click", () => {
     pendingReplaceId = null;
+    pendingPick = "add";
     el.file.click();
   });
   el.replaceImage.addEventListener("click", () => {
     pendingReplaceId = selectedId;
+    pendingPick = "add";
     el.file.click();
   });
   el.file.addEventListener("change", () => {
@@ -1054,10 +1335,18 @@ function initializeControls(): void {
   );
   el.fitWidth.addEventListener("click", () =>
     mutateImage((element) => {
-      const ratio = element.height / element.width;
-      element.width = PRINTER_WIDTH;
-      element.height = Math.round(PRINTER_WIDTH * ratio);
-      element.x = 0;
+      fitImageToPaper(element, Math.max(0, elementBounds(element).y));
+    }),
+  );
+  el.turn.addEventListener("click", () =>
+    mutateImage((element) => {
+      const before = elementBounds(element);
+      element.rotation = (element.rotation + 90) % 360;
+      const after = elementBounds(element);
+      // A full-width picture stays full width; anything too wide is shrunk.
+      if (before.width >= PRINTER_WIDTH - 1 || after.width > PRINTER_WIDTH) {
+        fitImageToPaper(element, Math.max(0, before.y));
+      }
     }),
   );
   el.resetAspect.addEventListener("click", () =>
@@ -1136,6 +1425,17 @@ function initializeControls(): void {
     refresh(false);
   });
   el.minHeight.addEventListener("change", () => refresh());
+  for (const button of el.darknessButtons) {
+    button.addEventListener("click", () => {
+      const preset = button.dataset.darkness as DarknessPreset;
+      if (preset === "custom") {
+        el.density.focus();
+        return;
+      }
+      setDensity(DARKNESS_PRESETS[preset]);
+    });
+  }
+  el.density.addEventListener("input", () => setDensity(Number(el.density.value)));
   el.feed.addEventListener("input", () => {
     feedLines = Number(el.feed.value);
     el.feedValue.textContent = String(feedLines);
@@ -1205,6 +1505,7 @@ function initializeShortcuts(): void {
     if (!file) return;
     event.preventDefault();
     pendingReplaceId = null;
+    pendingPick = "add";
     void loadImage(file);
   });
   window.addEventListener("paste", (event) => {
@@ -1214,6 +1515,7 @@ function initializeShortcuts(): void {
     if (!file) return;
     event.preventDefault();
     pendingReplaceId = null;
+    pendingPick = "add";
     void loadImage(file);
   });
 }
@@ -1242,6 +1544,7 @@ async function initialize(): Promise<void> {
   buildStickerGrid();
   initializeControls();
   initializeShortcuts();
+  setDensity(density);
   fitZoom();
 
   const restored = await restore();

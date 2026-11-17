@@ -133,21 +133,25 @@ export async function loadImageFromUrl(url: string): Promise<ImageSource> {
   return loadImageFromBlob(blob, name);
 }
 
-/** Pulls the first image out of a paste or drag-and-drop payload. */
+function isPrintableType(type: string): boolean {
+  return type.startsWith("image/") || type === "application/pdf";
+}
+
+/** Pulls the first image or PDF out of a paste or drag-and-drop payload. */
 export function imageFileFromDataTransfer(
   transfer: DataTransfer | null,
 ): File | null {
   if (!transfer) return null;
 
   for (const item of Array.from(transfer.items ?? [])) {
-    if (item.kind === "file" && item.type.startsWith("image/")) {
+    if (item.kind === "file" && isPrintableType(item.type)) {
       const file = item.getAsFile();
       if (file) return file;
     }
   }
 
   for (const file of Array.from(transfer.files ?? [])) {
-    if (file.type.startsWith("image/")) return file;
+    if (isPrintableType(file.type) || /\.pdf$/i.test(file.name)) return file;
   }
 
   return null;
